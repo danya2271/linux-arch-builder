@@ -101,7 +101,7 @@ echo ""
 
 read -p "Начать установку? (y/N): " confirm
 if [[ "$confirm" =~ ^[Yy]$ ]]; then
-    sudo pacman -U "${INSTALL_LIST[@]}"
+    sudo pacman -U "${INSTALL_LIST[@]}" --overwrite='*'
 
     echo -e "\n${GREEN}Установка завершена!${NC}"
 

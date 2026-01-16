@@ -224,7 +224,7 @@ options=(
     "LocalModConfig: Strip unused drivers (set as Modules)"
     "LocalYesConfig: Strip unused drivers (Built-in/Monolithic)"
     "Modprobed-DB: Use database of known hardware (Safest Strip)"
-    "Manual: Launch nconfig/menuconfig (Advanced Tuning)"
+    "Manual: Launch nconfig/xconfig (Advanced Tuning)"
     "Diagnostic: Check dmesg for missing firmware"
     "Skip: Keep existing configuration"
 )
@@ -244,6 +244,9 @@ select opt in "${options[@]}"; do
             # This turns all currently loaded modules into built-in (=y) features
             lsmod > /tmp/lsmod.list
             yes '' | make $MAKE_FLAGS LSMOD=/tmp/lsmod.list localyesconfig
+            setconf CONFIG_MODVERSIONS y
+            setconf CONFIG_MODULES y
+            setconf CONFIG_MODULE_UNLOAD y
             break
             ;;
         3)
@@ -431,7 +434,7 @@ if [ -n "$PKG_FILE" ]; then
 
     read -p "Install? (y/N): " inst
     if [[ "$inst" =~ ^[Yy]$ ]]; then
-        sudo pacman -U "$PKG_FILE" "$PKG_HEADER"
+        sudo pacman -U "$PKG_FILE" "$PKG_HEADER" --overwrite='*'
         echo -e "\n${YELLOW}IMPORTANT:${NC} Do not forget: sudo grub-mkconfig -o /boot/grub/grub.cfg"
     fi
 
