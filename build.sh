@@ -215,16 +215,71 @@ if [[ "$kill_debug" =~ ^[Yy]$ ]]; then
     set_conf CONFIG_BUG_ON_DATA_CORRUPTION n
 fi
 
-# --- 5. Drivers ---
-echo -e "\n${BLUE}=== [5/7] Drivers ===${NC}"
-echo "1) [STRIP] localmodconfig"
-echo "2) [MANUAL] menuconfig"
-echo "3) [SKIP]"
-read -p "Selection: " drv_mode
-case $drv_mode in
-    1) lsmod > /tmp/lsmod.list; yes '' | make $MAKE_FLAGS LSMOD=/tmp/lsmod.list localmodconfig ;;
-    2) make $MAKE_FLAGS menuconfig ;;
-esac
+# --- 5. Drivers & Hardware Optimization ---
+echo -e "\n${BLUE}=== [5/7] Hardware & Driver Configuration ===${NC}"
+
+# Options for an advanced kernel tailoring workflow
+options=(
+    "LocalModConfig: Strip unused drivers (set as Modules)"
+    "LocalYesConfig: Strip unused drivers (Built-in/Monolithic)"
+    "Modprobed-DB: Use database of known hardware (Safest Strip)"
+    "Manual: Launch nconfig/menuconfig (Advanced Tuning)"
+    "Diagnostic: Check dmesg for missing firmware"
+    "Skip: Keep existing configuration"
+)
+
+PS3="Please select your configuration mode (1-${#options[@]}): "
+
+select opt in "${options[@]}"; do
+    case $REPLY in
+        1)
+            echo -e "${YELLOW}Running localmodconfig...${NC}"
+            lsmod > /tmp/lsmod.list
+            yes '' | make $MAKE_FLAGS LSMOD=/tmp/lsmod.list localmodconfig
+            break
+            ;;
+        2)
+            echo -e "${YELLOW}Running localyesconfig (Monolithic build)...${NC}"
+            # This turns all currently loaded modules into built-in (=y) features
+            lsmod > /tmp/lsmod.list
+            yes '' | make $MAKE_FLAGS LSMOD=/tmp/lsmod.list localyesconfig
+            break
+            ;;
+        3)
+            if [ -f "$HOME/.config/modprobed.db" ]; then
+                echo -e "${YELLOW}Applying localmodconfig using modprobed-db...${NC}"
+                make $MAKE_FLAGS LSMOD="$HOME/.config/modprobed.db" localmodconfig
+            else
+                echo -e "${RED}Error: modprobed.db not found at $HOME/.config/modprobed.db${NC}"
+                echo "Falling back to standard lsmod scan..."
+                lsmod > /tmp/lsmod.list
+                make $MAKE_FLAGS LSMOD=/tmp/lsmod.list localmodconfig
+            fi
+            break
+            ;;
+        4)
+            # nconfig is preferred for its better search and modern UI
+            echo -e "${YELLOW}Opening manual configuration...${NC}"
+            make $MAKE_FLAGS nconfig || make $MAKE_FLAGS menuconfig
+            break
+            ;;
+        5)
+            echo -e "${BLUE}Scanning for firmware errors in dmesg:${NC}"
+            # Filters for common missing blob errors
+            dmesg | grep -iE "firmware|failed|missing" | grep -v "status 0" || echo "No missing firmware detected."
+            echo -e "\nPress any key to return to the menu..."
+            read -n 1
+            echo -e "\n"
+            ;;
+        6)
+            echo "Skipping driver tailoring."
+            break
+            ;;
+        *)
+            echo "Invalid option: $REPLY. Please choose 1-${#options[@]}."
+            ;;
+    esac
+done
 
 # --- 6. CPU Opt ---
 echo -e "\n${BLUE}=== [6/7] CPU Optimization ===${NC}"
