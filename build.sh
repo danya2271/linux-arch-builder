@@ -112,6 +112,11 @@ if [ "$opt_choice" == "1" ] || [ "$opt_choice" == "2" ]; then
         set_conf CONFIG_PREEMPT_VOLUNTARY n
         set_conf CONFIG_PREEMPT y
         set_conf CONFIG_PREEMPT_DYNAMIC y
+    else
+        # Default: Voluntary preemption (standard desktop)
+        set_conf CONFIG_PREEMPT n
+        set_conf CONFIG_PREEMPT_VOLUNTARY y
+        set_conf CONFIG_PREEMPT_DYNAMIC n
     fi
 
     # --- HZ ---
@@ -120,6 +125,11 @@ if [ "$opt_choice" == "1" ] || [ "$opt_choice" == "2" ]; then
         set_conf CONFIG_HZ_250 n
         set_conf CONFIG_HZ_1000 y
         set_conf CONFIG_HZ 1000
+    else
+        # Default: 250Hz (balanced)
+        set_conf CONFIG_HZ_1000 n
+        set_conf CONFIG_HZ_250 y
+        set_conf CONFIG_HZ 250
     fi
 
     # --- MGLRU ---
@@ -127,6 +137,10 @@ if [ "$opt_choice" == "1" ] || [ "$opt_choice" == "2" ]; then
     if [ "$opt_choice" == "1" ] || ask_opt "MGLRU" "$DESC"; then
         set_conf CONFIG_LRU_GEN y
         set_conf CONFIG_LRU_GEN_ENABLED y
+    else
+        # Default: Standard LRU
+        set_conf CONFIG_LRU_GEN n
+        set_conf CONFIG_LRU_GEN_ENABLED n
     fi
 
     # --- THP ---
@@ -134,6 +148,10 @@ if [ "$opt_choice" == "1" ] || [ "$opt_choice" == "2" ]; then
     if [ "$opt_choice" == "1" ] || ask_opt "THP (Madvise mode)" "$DESC"; then
         set_conf CONFIG_TRANSPARENT_HUGEPAGE_ALWAYS n
         set_conf CONFIG_TRANSPARENT_HUGEPAGE_MADVISE y
+    else
+        # Default: Always (standard kernel default)
+        set_conf CONFIG_TRANSPARENT_HUGEPAGE_MADVISE n
+        set_conf CONFIG_TRANSPARENT_HUGEPAGE_ALWAYS y
     fi
 
     # --- TCP BBR ---
@@ -141,6 +159,11 @@ if [ "$opt_choice" == "1" ] || [ "$opt_choice" == "2" ]; then
     if [ "$opt_choice" == "1" ] || ask_opt "TCP BBR" "$DESC"; then
         set_conf CONFIG_TCP_CONG_BBR y
         set_conf CONFIG_DEFAULT_TCP_CONG "bbr"
+    else
+        # Default: Cubic
+        set_conf CONFIG_TCP_CONG_BBR n
+        set_conf CONFIG_TCP_CONG_CUBIC y
+        set_conf CONFIG_DEFAULT_TCP_CONG "cubic"
     fi
 
     make $MAKE_FLAGS olddefconfig
