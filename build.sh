@@ -277,7 +277,8 @@ select opt in "${options[@]}"; do
             break
             ;;
         *)
-            echo "Invalid option: $REPLY. Please choose 1-${#options[@]}."
+            echo "Invalid option: $REPLY. Skipping"
+            break
             ;;
     esac
 done
