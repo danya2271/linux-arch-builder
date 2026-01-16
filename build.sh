@@ -284,11 +284,23 @@ done
 
 # --- 6. CPU Opt ---
 echo -e "\n${BLUE}=== [6/7] CPU Optimization ===${NC}"
-echo "1) [NATIVE]   Use Host CPU"
-echo "2) [Generic]  Generic"
-echo "3) [Legacy]   x86-64-v2"
-echo "4) [Modern]   x86-64-v3"
-echo "5) [Bleeding] x86-64-v4"
+
+FLAGS=$(grep -m1 "flags" /proc/cpuinfo)
+
+# x86-64-v2: popcnt, sse4_1, sse4_2, ssse3
+grep -q "popcnt" <<< "$FLAGS" && grep -q "sse4_2" <<< "$FLAGS" && grep -q "ssse3" <<< "$FLAGS" && V2_SUP=1 || V2_SUP=0
+# x86-64-v3: avx, avx2, bmi1, bmi2, f16c, fma, movbe, xsave
+grep -q "avx2" <<< "$FLAGS" && grep -q "bmi2" <<< "$FLAGS" && grep -q "fma" <<< "$FLAGS" && V3_SUP=1 || V3_SUP=0
+# x86-64-v4: avx512f, avx512bw, avx512cd, avx512dq, avx512vl
+grep -q "avx512f" <<< "$FLAGS" && grep -q "avx512bw" <<< "$FLAGS" && V4_SUP=1 || V4_SUP=0
+
+get_status() { [[ $1 -eq 1 ]] && echo -e "${GREEN}[Supported]${NC}" || echo -e "${RED}[Unsupported]${NC}"; }
+
+echo -e "1) [NATIVE]   Use Host CPU      ${GREEN}[Recommended]${NC}"
+echo -e "2) [Generic]  Generic           ${GREEN}[Universal]${NC}"
+echo -e "3) [Legacy]   x86-64-v2         $(get_status $V2_SUP)"
+echo -e "4) [Modern]   x86-64-v3         $(get_status $V3_SUP)"
+echo -e "5) [Bleeding] x86-64-v4         $(get_status $V4_SUP)"
 read -p "Selection: " cpu_opt
 
 KCFLAGS_OPT="-mtune=generic"
