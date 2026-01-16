@@ -25,7 +25,7 @@ SAVED_CONFIG_PATH="$WORK_DIR/$SAVED_CONFIG_NAME"
 echo -e "${BLUE}=== [1/7] Source Code ===${NC}"
 if [ ! -d "$SRC_DIR_NAME" ]; then
     echo -e "${YELLOW}Cloning repository...${NC}"
-    git clone "$REPO_URL" "$SRC_DIR_NAME"
+    git clone "$REPO_URL" "$SRC_DIR_NAME" --depth=1
 else
     echo -e "${GREEN}Repository found.${NC}"
     read -p "Run 'git pull'? (y/N): " do_pull
