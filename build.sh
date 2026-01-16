@@ -89,10 +89,11 @@ read -p "Selection: " config_src
 if [ -f ".config" ]; then rm .config; fi
 
 case $config_src in
+    1) zcat /proc/config.gz > .config ;;
     2) [ -f "$SAVED_CONFIG_PATH" ] && cp "$SAVED_CONFIG_PATH" .config || zcat /proc/config.gz > .config ;;
     3) read -e -p "Enter path: " p; cp "${p/#\~/$HOME}" .config ;;
     4) find arch/x86/configs/ -name "*_defconfig" -printf "%f\n"; read -p "Name: " d; make $MAKE_FLAGS "$d" ;;
-    *) zcat /proc/config.gz > .config ;;
+    *) [ -f "$SAVED_CONFIG_PATH" ] && cp "$SAVED_CONFIG_PATH" .config || zcat /proc/config.gz > .config ;;
 esac
 make $MAKE_FLAGS olddefconfig
 
