@@ -97,6 +97,8 @@ case $config_src in
 esac
 make $MAKE_FLAGS olddefconfig
 
+set_conf CONFIG_LOCALVERSION_AUTO n
+
 # --- 3.5 Optimization Layer ---
 echo -e "\n${BLUE}=== [3.5] Optimization Layer ===${NC}"
 echo "1) [Gaming]  Auto-apply best gaming tweaks"
@@ -344,7 +346,8 @@ sha256sums=('SKIP' 'SKIP')
 
 pkgver() {
   cd "${SRC_DIR_NAME}"
-  make kernelversion | tr '-' '_'
+  # Очищаем версию от пробелов и лишнего
+  make kernelversion | tr -d '[:space:]' | tr '-' '_'
 }
 
 prepare() {
@@ -356,6 +359,10 @@ prepare() {
 build() {
   cd "${SRC_DIR_NAME}"
   make $MAKE_FLAGS KCFLAGS="${KCFLAGS_OPT} -O3 -pipe" -j\$(nproc) all
+
+  # --- SAVE EXACT KERNEL VERSION ---
+  # Сохраняем точную версию в файл, чтобы она совпадала в обоих пакетах
+  make kernelrelease > ../version.txt
 }
 
 package_$PKG_NAME() {
@@ -365,19 +372,25 @@ package_$PKG_NAME() {
   provides=("VMLINUZ")
 
   cd "${SRC_DIR_NAME}"
-  local kernver="\$(make kernelrelease)"
+  # Читаем сохраненную версию (удаляем пробелы)
+  local kernver="\$(cat ../version.txt | tr -d '[:space:]')"
   local modulesdir="\${pkgdir}/usr/lib/modules/\${kernver}"
 
+  echo "Installing modules for version: [\${kernver}]"
   make $MAKE_FLAGS INSTALL_MOD_PATH="\${pkgdir}/usr" modules_install
 
+  # Удаляем сломанные симлинки от make modules_install
   rm -f "\${modulesdir}/build" "\${modulesdir}/source"
 
+  # Создаем правильный симлинк на /usr/src (где будут заголовки)
+  # Это ключевой момент для DKMS
+  ln -sf "/usr/src/linux-kknx-\${kernver}" "\${modulesdir}/build"
+
+  # Установка ядра
   mkdir -p "\${pkgdir}/boot"
   cp arch/x86/boot/bzImage "\${pkgdir}/boot/vmlinuz-${PKG_NAME}"
 
-  mkdir -p "\${modulesdir}"
-  cp arch/x86/boot/bzImage "\${modulesdir}/vmlinuz"
-
+  # Mkinitcpio preset
   mkdir -p "\${pkgdir}/etc/mkinitcpio.d/"
   echo "# Preset for ${PKG_NAME}" > "\${pkgdir}/etc/mkinitcpio.d/${PKG_NAME}.preset"
   echo "ALL_kver='/boot/vmlinuz-${PKG_NAME}'" >> "\${pkgdir}/etc/mkinitcpio.d/${PKG_NAME}.preset"
@@ -390,28 +403,43 @@ package_$PKG_NAME-headers() {
   pkgdesc="Kernel KKNX headers"
   depends=('pahole')
   cd "${SRC_DIR_NAME}"
-  local builddir="\${pkgdir}/usr/lib/modules/\$(make kernelrelease)/build"
+  local kernver="\$(cat ../version.txt | tr -d '[:space:]')"
+  local builddir="\${pkgdir}/usr/src/linux-kknx-\${kernver}"
+
+  echo "Installing headers to: \${builddir}"
   mkdir -p "\${builddir}"
 
-  echo "Packing headers..."
+  # Копируем основные файлы
   cp .config Makefile Module.symvers System.map "\${builddir}/"
 
-  mkdir -p "\${builddir}/scripts"
-  cp scripts/module.lds "\${builddir}/scripts/"
+  # Копируем директории
   cp -a include scripts arch "\${builddir}/"
 
-  mkdir -p "\${builddir}/tools/objtool"
+  # Очистка от мусора (.o), но осторожно
+  find "\${builddir}/scripts" -type f -name "*.o" -delete
+  find "\${builddir}/arch" -type f -name "*.o" -delete
+
+  # --- DKMS FIX: Tools ---
+  # Копируем objtool (обязательно)
   if [ -f tools/objtool/objtool ]; then
+    mkdir -p "\${builddir}/tools/objtool"
     cp tools/objtool/objtool "\${builddir}/tools/objtool/"
   fi
 
-  mkdir -p "\${builddir}/tools/bpf/resolve_btfids"
+  # Копируем resolve_btfids (если есть)
   if [ -f tools/bpf/resolve_btfids/resolve_btfids ]; then
+    mkdir -p "\${builddir}/tools/bpf/resolve_btfids"
     cp tools/bpf/resolve_btfids/resolve_btfids "\${builddir}/tools/bpf/resolve_btfids/"
   fi
 
-  find "\${builddir}" -name "*.o" -delete
+  # Удаляем временные файлы
   find "\${builddir}" -name "*.cmd" -delete
+  find "\${builddir}" -name "*.a" -delete
+  find "\${builddir}" -name "..install.cmd" -delete
+
+  # --- CRITICAL FIX ---
+  # Убеждаемся, что скрипты запускаемые
+  chmod 755 -R "\${builddir}/scripts"
 }
 EOF
 
@@ -434,10 +462,36 @@ if [ -n "$PKG_FILE" ]; then
 
     read -p "Install? (y/N): " inst
     if [[ "$inst" =~ ^[Yy]$ ]]; then
-        sudo pacman -U "$PKG_FILE" "$PKG_HEADER" --overwrite='*'
+
+        # --- 1. CLEANUP CONFLICTS ---
+        echo -e "${YELLOW}Checking for conflicting directories...${NC}"
+
+        # Get correct path
+        cd "$WORK_DIR/$SRC_DIR_NAME"
+        CURRENT_KVER=$(make kernelrelease)
+        cd "$WORK_DIR/build"
+
+        CONFLICT_DIR="/usr/lib/modules/$CURRENT_KVER/build"
+        CONFLICT_SRC="/usr/lib/modules/$CURRENT_KVER/source"
+
+        # Remove old symlinks or directories to avoid Pacman conflicts
+        if [ -e "$CONFLICT_DIR" ]; then
+            echo "Removing conflicting entry: $CONFLICT_DIR"
+            sudo rm -rf "$CONFLICT_DIR"
+        fi
+
+        if [ -e "$CONFLICT_SRC" ]; then
+             echo "Removing conflicting entry: $CONFLICT_SRC"
+             sudo rm -rf "$CONFLICT_SRC"
+        fi
+        # ----------------------------
+
+        sudo pacman -U "$PKG_FILE" "$PKG_HEADER" --overwrite='*' --noconfirm
+
         echo -e "\n${YELLOW}IMPORTANT:${NC} Do not forget: sudo grub-mkconfig -o /boot/grub/grub.cfg"
     fi
 
+    # ... (Export part remains same)
     read -p "Export to $EXPORT_DIR? (y/N): " exp
     if [[ "$exp" =~ ^[Yy]$ ]]; then
         mkdir -p "$EXPORT_DIR"
