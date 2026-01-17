@@ -101,72 +101,203 @@ set_conf CONFIG_LOCALVERSION_AUTO n
 
 # --- 3.5 Optimization Layer ---
 echo -e "\n${BLUE}=== [3.5] Optimization Layer ===${NC}"
-echo "1) [Gaming]  Auto-apply best gaming tweaks"
-echo "2) [Manual]  Set each flag manually with description"
-echo "3) [Skip]    Keep base config as-is"
+echo "1) [Gaming]  Auto-apply best gaming tweaks (Low Latency / High Perf)"
+echo "2) [Laptop]  Auto-apply best battery tweaks (Power Save / Secure)"
+echo "3) [Manual]  Set each flag manually with description"
+echo "4) [Skip]    Keep base config as-is"
 read -p "Selection: " opt_choice
 
-if [ "$opt_choice" == "1" ] || [ "$opt_choice" == "2" ]; then
+if [[ "$opt_choice" =~ ^(1|2|3)$ ]]; then
     set_conf CONFIG_EXPERT y
 
-    # --- Preemption ---
-    DESC="Reduces latency by allowing the kernel to interrupt tasks. Essential for gaming/desktop."
-    if [ "$opt_choice" == "1" ] || ask_opt "Full Preemption (PREEMPT)" "$DESC"; then
+    # ==========================================================
+    # [A] SECURITY MITIGATIONS (The "Free Performance" Switch)
+    # ==========================================================
+    # Gaming: Disable mitigations (Spectre/Meltdown). Riskier, but 5-20% faster.
+    # Laptop: Enable mitigations. Safer for untrusted webs/apps.
+    DESC_MIT_OFF="Disable Mitigations. Boosts CPU performance significantly, reduces security."
+
+    if [ "$opt_choice" == "1" ] || ([ "$opt_choice" == "3" ] && ask_opt "Disable CPU Mitigations (Speed Boost)" "$DESC_MIT_OFF"); then
+        set_conf CONFIG_SPECULATION_MITIGATIONS n
+        set_conf CONFIG_MITIGATION_RETPOLINE n
+        set_conf CONFIG_MITIGATION_SLS n
+        set_conf CONFIG_RETPOLINE n
+        set_conf CONFIG_SLS n
+    else
+        # Default / Laptop (Secure)
+        set_conf CONFIG_SPECULATION_MITIGATIONS y
+    fi
+
+    # ==========================================================
+    # [B] CPU SCHEDULING & GOVERNORS
+    # ==========================================================
+
+    # --- 1. Preemption (Latency vs Throughput) ---
+    DESC="Full Preemption. Essential for Gaming smoothness/input latency."
+    if [ "$opt_choice" == "1" ] || ([ "$opt_choice" == "3" ] && ask_opt "Full Preemption (PREEMPT)" "$DESC"); then
         set_conf CONFIG_PREEMPT_VOLUNTARY n
         set_conf CONFIG_PREEMPT y
         set_conf CONFIG_PREEMPT_DYNAMIC y
     else
-        # Default: Voluntary preemption (standard desktop)
         set_conf CONFIG_PREEMPT n
         set_conf CONFIG_PREEMPT_VOLUNTARY y
-        set_conf CONFIG_PREEMPT_DYNAMIC n
     fi
 
-    # --- HZ ---
-    DESC="Sets the internal clock frequency. 1000Hz makes mouse/UI feel smoother but uses slightly more CPU."
-    if [ "$opt_choice" == "1" ] || ask_opt "1000Hz Timer Frequency" "$DESC"; then
+    # --- 2. Timer Frequency (HZ) ---
+    DESC_1000="1000Hz Timer. Best for mouse smoothness/gaming."
+    DESC_300="300Hz Timer. Best balance for video sync and battery."
+    DESC_100="100Hz Timer. Best for battery. Worst for latency."
+    if [ "$opt_choice" == "1" ] || ([ "$opt_choice" == "3" ] && ask_opt "1000Hz Timer" "$DESC_1000"); then
+        set_conf CONFIG_HZ_100 n
         set_conf CONFIG_HZ_250 n
+        set_conf CONFIG_HZ_300 n
         set_conf CONFIG_HZ_1000 y
         set_conf CONFIG_HZ 1000
-    else
-        # Default: 250Hz (balanced)
+    elif [ "$opt_choice" == "2" ] || ([ "$opt_choice" == "3" ] && ask_opt "300Hz Timer" "$DESC_300"); then
+        set_conf CONFIG_HZ_100 n
+        set_conf CONFIG_HZ_250 n
+        set_conf CONFIG_HZ_300 y
         set_conf CONFIG_HZ_1000 n
+        set_conf CONFIG_HZ 300
+    elif ([ "$opt_choice" == "3" ] && ask_opt "100Hz Timer" "$DESC_100"); then
+        set_conf CONFIG_HZ_100 y
+        set_conf CONFIG_HZ_250 n
+        set_conf CONFIG_HZ_300 n
+        set_conf CONFIG_HZ_1000 n
+        set_conf CONFIG_HZ 100
+    else
+        set_conf CONFIG_HZ_100 n
+        set_conf CONFIG_HZ_300 n
         set_conf CONFIG_HZ_250 y
+        set_conf CONFIG_HZ_1000 n
         set_conf CONFIG_HZ 250
     fi
 
-    # --- MGLRU ---
-    DESC="Multi-Gen LRU. Better memory management under load, prevents micro-stutters when RAM is full."
-    if [ "$opt_choice" == "1" ] || ask_opt "MGLRU" "$DESC"; then
-        set_conf CONFIG_LRU_GEN y
-        set_conf CONFIG_LRU_GEN_ENABLED y
+    # --- 3. Default CPU IDLE governor ---
+    # TEO (Timer Events Oriented) is newer and often better for battery
+    # on tickless (NO_HZ) systems than the standard 'Menu' governor.
+    DESC_TEO="Use TEO Idle Governor. Best for battery on modern tickless kernels."
+    if [ "$opt_choice" != "1" ] || ask_opt "Use TEO Idle Governor" "$DESC_TEO"; then
+        set_conf CONFIG_CPU_IDLE_GOV_TEO y
+        set_conf CONFIG_CPU_IDLE_GOV_MENU n
     else
-        # Default: Standard LRU
-        set_conf CONFIG_LRU_GEN n
-        set_conf CONFIG_LRU_GEN_ENABLED n
+        # Standard Menu Governor (better for server/steady loads)
+        set_conf CONFIG_CPU_IDLE_GOV_TEO n
+        set_conf CONFIG_CPU_IDLE_GOV_MENU y
     fi
 
-    # --- THP ---
-    DESC="Transparent Hugepages. 'Madvise' is safer for gaming than 'Always' (prevents stuttering)."
-    if [ "$opt_choice" == "1" ] || ask_opt "THP (Madvise mode)" "$DESC"; then
-        set_conf CONFIG_TRANSPARENT_HUGEPAGE_ALWAYS n
-        set_conf CONFIG_TRANSPARENT_HUGEPAGE_MADVISE y
-    else
-        # Default: Always (standard kernel default)
-        set_conf CONFIG_TRANSPARENT_HUGEPAGE_MADVISE n
-        set_conf CONFIG_TRANSPARENT_HUGEPAGE_ALWAYS y
+    # --- 3. Default CPU Governor ---
+    DESC_PERF="Performance Governor. Pins clocks high. Max responsiveness."
+    DESC_SCHED="Schedutil Governor. Intelligent scaling. Best for battery."
+    if [ "$opt_choice" == "1" ] || ([ "$opt_choice" == "3" ] && ask_opt "Default Governor: Performance" "$DESC_PERF"); then
+        set_conf CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE y
+        set_conf CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL n
+    elif [ "$opt_choice" == "2" ] || ([ "$opt_choice" == "3" ] && ask_opt "Default Governor: Schedutil" "$DESC_SCHED"); then
+         set_conf CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE n
+         set_conf CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL y
     fi
 
-    # --- TCP BBR ---
-    DESC="Google's BBR congestion control. Improves download speeds and reduces bufferbloat/ping."
-    if [ "$opt_choice" == "1" ] || ask_opt "TCP BBR" "$DESC"; then
+    # ==========================================================
+    # [C] STORAGE (I/O) SCHEDULING
+    # ==========================================================
+
+    # Gaming: Kyber (Low latency for NVMe).
+    # Laptop: BFQ (Fairness, prevents system lockup during heavy copies).
+    DESC_KYBER="Kyber I/O. Simple, low overhead. Best for pure NVMe gaming."
+    DESC_BFQ="BFQ I/O. Complex, high fairness. Smooth desktop usage under load."
+
+    if [ "$opt_choice" == "1" ] || ([ "$opt_choice" == "3" ] && ask_opt "Use Kyber I/O (Gaming)" "$DESC_KYBER"); then
+        set_conf CONFIG_MQ_IOSCHED_KYBER y
+        set_conf CONFIG_IOSCHED_BFQ n
+        set_conf CONFIG_DEFAULT_KYBER y
+        set_conf CONFIG_DEFAULT_IOSCHED "kyber"
+    elif [ "$opt_choice" == "2" ] || ([ "$opt_choice" == "3" ] && ask_opt "Use BFQ I/O (Smoothness)" "$DESC_BFQ"); then
+        set_conf CONFIG_IOSCHED_BFQ y
+        set_conf CONFIG_DEFAULT_BFQ y
+        set_conf CONFIG_DEFAULT_IOSCHED "bfq"
+    fi
+
+    # ==========================================================
+    # [D] MEMORY, NETWORK & BATTERY
+    # ==========================================================
+
+    # --- 1. SATA/AHCI Link Power Management (LPM) ---
+    # This is often the culprit for high sleep drain if you have SATA SSDs or controllers.
+    # Policy 3 = Med_Power_with_DIPM (Device Initiated Power Management)
+    DESC_SATA="SATA Mobile LPM. Essential for dropping SATA link power."
+    if [ "$opt_choice" == "2" ] || [ "$opt_choice" == "3" ] || ask_opt "Enable SATA Mobile LPM" "$DESC_SATA"; then
+        set_conf CONFIG_SATA_MOBILE_LPM_POLICY 3
+    else
+        set_conf CONFIG_SATA_MOBILE_LPM_POLICY 0
+    fi
+
+    # --- 2. Wi-Fi Power Save Default ---
+    # Forces the Wi-Fi driver to enable power saving immediately on boot.
+    DESC_WIFI="Wi-Fi Power Save Default. Enable radio sleep on boot."
+    if [ "$opt_choice" == "2" ] || [ "$opt_choice" == "3" ] || ask_opt "Enable Wi-Fi PS" "$DESC_WIFI"; then
+        set_conf CONFIG_CFG80211_DEFAULT_PS y
+    else
+        set_conf CONFIG_CFG80211_DEFAULT_PS n
+    fi
+
+    # --- 3. PCIe ASPM (Active State Power Management) ---
+    # Laptop: Supersave (Max battery, aggressive link sleep).
+    # Gaming: Performance (Keeps links awake to avoid wake-latency stutters).
+    DESC_ASPM="PCIe ASPM Supersave. Force PCIe links (WiFi/SSD) to low power. Essential for Laptop battery."
+
+    if [ "$opt_choice" == "2" ] || ([ "$opt_choice" == "3" ] && ask_opt "Enable PCIe ASPM Supersave" "$DESC_ASPM"); then
+        set_conf CONFIG_PCIEASPM y
+        set_conf CONFIG_PCIEASPM_POWER_SUPERSAVE y
+        set_conf CONFIG_PCIEASPM_PERFORMANCE n
+        set_conf CONFIG_PCIEASPM_DEFAULT n
+    elif [ "$opt_choice" == "1" ]; then
+        # Gaming: Force Performance to prevent stutter
+        set_conf CONFIG_PCIEASPM y
+        set_conf CONFIG_PCIEASPM_PERFORMANCE y
+        set_conf CONFIG_PCIEASPM_POWER_SUPERSAVE n
+    fi
+
+    # --- 4. Deep Sleep Tweaks (Laptop Focused) ---
+    DESC="Power Efficient WQ & RCU Lazy. Essential for battery life (Deep Sleep)."
+    if [ "$opt_choice" == "2" ] || ([ "$opt_choice" == "3" ] && ask_opt "Enable Deep Sleep Tweaks" "$DESC"); then
+        # Move tasks to power-efficient cores
+        set_conf CONFIG_WQ_POWER_EFFICIENT_DEFAULT y
+        # Batch RCU updates (less wakeups)
+        set_conf CONFIG_RCU_LAZY y
+        set_conf CONFIG_RCU_NOCB_CPU y
+        # Power down audio chip after 5s
+        set_conf CONFIG_SND_HDA_POWER_SAVE_DEFAULT 5
+        # Disable NMI Watchdog (wasted energy on stable systems)
+        set_conf CONFIG_HARDLOCKUP_DETECTOR n
+    else
+        # Gaming Defaults
+        set_conf CONFIG_WQ_POWER_EFFICIENT_DEFAULT n
+        set_conf CONFIG_SND_HDA_POWER_SAVE_DEFAULT 0
+    fi
+
+    # --- 5. ZSWAP (Compressed RAM) ---
+    DESC="Enable ZSWAP. Compresses RAM to reduce disk swapping. Faster & Efficient."
+    if [ "$opt_choice" == "1" ] || [ "$opt_choice" == "2" ] || ask_opt "Enable ZSWAP" "$DESC"; then
+        set_conf CONFIG_ZSWAP y
+        set_conf CONFIG_ZSWAP_DEFAULT_ON y
+        set_conf CONFIG_ZPOOL y
+        set_conf CONFIG_ZBUD y
+    fi
+
+    # --- 6. TCP BBR ---
+    DESC="TCP BBR. Improved network throughput and latency."
+    if [ "$opt_choice" == "1" ] || [ "$opt_choice" == "2" ] || ask_opt "Enable TCP BBR" "$DESC"; then
         set_conf CONFIG_TCP_CONG_BBR y
         set_conf CONFIG_DEFAULT_TCP_CONG "bbr"
-    else
-        # Default: Cubic
-        set_conf CONFIG_TCP_CONG_BBR n
-        set_conf CONFIG_TCP_CONG_CUBIC y
-        set_conf CONFIG_DEFAULT_TCP_CONG "cubic"
+    fi
+
+    # --- 7. MGLRU & THP ---
+    DESC="MGLRU & THP Madvise. Best modern defaults for smoothness."
+    if [ "$opt_choice" == "1" ] || [ "$opt_choice" == "2" ] || ask_opt "Enable MGLRU & Madvise" "$DESC"; then
+        set_conf CONFIG_LRU_GEN y
+        set_conf CONFIG_LRU_GEN_ENABLED y
+        set_conf CONFIG_TRANSPARENT_HUGEPAGE_ALWAYS n
+        set_conf CONFIG_TRANSPARENT_HUGEPAGE_MADVISE y
     fi
 
     make $MAKE_FLAGS olddefconfig
@@ -212,7 +343,12 @@ if [[ "$kill_debug" =~ ^[Yy]$ ]]; then
     set_conf CONFIG_DEBUG_MEMORY_INIT n
     set_conf CONFIG_KFENCE n
 
-    # 6. Different
+    # 6. Battery-related
+    set_conf CONFIG_PM_DEBUG n
+    set_conf CONFIG_ACPI_DEBUG n
+    set_conf CONFIG_PM_TRACE n
+
+    # 7. Other
     set_conf CONFIG_DEBUG_BUGVERBOSE n
     set_conf CONFIG_DEBUG_LIST n
     set_conf CONFIG_BUG_ON_DATA_CORRUPTION n
