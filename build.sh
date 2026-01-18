@@ -508,6 +508,23 @@ cd build
 # --- 7. PKGBUILD ---
 echo -e "\n${BLUE}=== [7/7] PKGBUILD ===${NC}"
 
+cat > "${PKG_NAME}.install" <<EOF
+post_install() {
+  echo ">>> KKNX kernel installed. Generating initramfs..."
+  mkinitcpio -p ${PKG_NAME}
+}
+
+post_upgrade() {
+  post_install
+}
+
+post_remove() {
+  echo ">>> Removing initramfs images for ${PKG_NAME}..."
+  rm -f boot/initramfs-${PKG_NAME}.img
+  rm -f boot/initramfs-${PKG_NAME}-fallback.img
+}
+EOF
+
 cat > PKGBUILD <<EOF
 # Maintainer: danya2271
 pkgbase=$PKG_NAME
@@ -525,7 +542,6 @@ sha256sums=('SKIP' 'SKIP')
 
 pkgver() {
   cd "${SRC_DIR_NAME}"
-  # Очищаем версию от пробелов и лишнего
   make kernelversion | tr -d '[:space:]' | tr '-' '_'
 }
 
@@ -539,8 +555,6 @@ build() {
   cd "${SRC_DIR_NAME}"
   make $MAKE_FLAGS KCFLAGS="${KCFLAGS_OPT} -O3 -pipe" -j\$(nproc) all
 
-  # --- SAVE EXACT KERNEL VERSION ---
-  # Сохраняем точную версию в файл, чтобы она совпадала в обоих пакетах
   make kernelrelease > ../version.txt
 }
 
@@ -551,25 +565,19 @@ package_$PKG_NAME() {
   provides=("VMLINUZ")
 
   cd "${SRC_DIR_NAME}"
-  # Читаем сохраненную версию (удаляем пробелы)
   local kernver="\$(cat ../version.txt | tr -d '[:space:]')"
   local modulesdir="\${pkgdir}/usr/lib/modules/\${kernver}"
 
   echo "Installing modules for version: [\${kernver}]"
   make $MAKE_FLAGS INSTALL_MOD_PATH="\${pkgdir}/usr" modules_install
 
-  # Удаляем сломанные симлинки от make modules_install
   rm -f "\${modulesdir}/build" "\${modulesdir}/source"
 
-  # Создаем правильный симлинк на /usr/src (где будут заголовки)
-  # Это ключевой момент для DKMS
   ln -sf "/usr/src/linux-kknx-\${kernver}" "\${modulesdir}/build"
 
-  # Установка ядра
   mkdir -p "\${pkgdir}/boot"
   cp arch/x86/boot/bzImage "\${pkgdir}/boot/vmlinuz-${PKG_NAME}"
 
-  # Mkinitcpio preset
   mkdir -p "\${pkgdir}/etc/mkinitcpio.d/"
   echo "# Preset for ${PKG_NAME}" > "\${pkgdir}/etc/mkinitcpio.d/${PKG_NAME}.preset"
   echo "ALL_kver='/boot/vmlinuz-${PKG_NAME}'" >> "\${pkgdir}/etc/mkinitcpio.d/${PKG_NAME}.preset"
@@ -588,36 +596,27 @@ package_$PKG_NAME-headers() {
   echo "Installing headers to: \${builddir}"
   mkdir -p "\${builddir}"
 
-  # Копируем основные файлы
   cp .config Makefile Module.symvers System.map "\${builddir}/"
 
-  # Копируем директории
   cp -a include scripts arch "\${builddir}/"
 
-  # Очистка от мусора (.o), но осторожно
   find "\${builddir}/scripts" -type f -name "*.o" -delete
   find "\${builddir}/arch" -type f -name "*.o" -delete
 
-  # --- DKMS FIX: Tools ---
-  # Копируем objtool (обязательно)
   if [ -f tools/objtool/objtool ]; then
     mkdir -p "\${builddir}/tools/objtool"
     cp tools/objtool/objtool "\${builddir}/tools/objtool/"
   fi
 
-  # Копируем resolve_btfids (если есть)
   if [ -f tools/bpf/resolve_btfids/resolve_btfids ]; then
     mkdir -p "\${builddir}/tools/bpf/resolve_btfids"
     cp tools/bpf/resolve_btfids/resolve_btfids "\${builddir}/tools/bpf/resolve_btfids/"
   fi
 
-  # Удаляем временные файлы
   find "\${builddir}" -name "*.cmd" -delete
   find "\${builddir}" -name "*.a" -delete
   find "\${builddir}" -name "..install.cmd" -delete
 
-  # --- CRITICAL FIX ---
-  # Убеждаемся, что скрипты запускаемые
   chmod 755 -R "\${builddir}/scripts"
 }
 EOF
