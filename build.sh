@@ -546,7 +546,7 @@ build() {
 
 package_$PKG_NAME() {
   pkgdesc="The KKNX Kernel image"
-  depends=('kmod' 'initramfs')
+  depends=('kmod' 'initramfs' 'mkinitcpio')
   optdepends=('linux-firmware: firmware images needed for some devices')
   provides=("VMLINUZ")
 
