@@ -451,7 +451,7 @@ select opt in "${options[@]}"; do
         5)
             echo -e "${BLUE}Scanning for firmware errors in dmesg:${NC}"
             # Filters for common missing blob errors
-            dmesg | grep -iE "firmware|failed|missing" | grep -v "status 0" || echo "No missing firmware detected."
+            sudo dmesg | grep -iE "firmware|failed|missing" | grep -v "status 0" || echo "No missing firmware detected."
             echo -e "\nPress any key to return to the menu..."
             read -n 1
             echo -e "\n"
