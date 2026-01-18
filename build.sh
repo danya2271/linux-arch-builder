@@ -129,7 +129,50 @@ if [[ "$opt_choice" =~ ^(1|2|3)$ ]]; then
     fi
 
     # ==========================================================
-    # [B] CPU SCHEDULING & GOVERNORS
+    # [B] BACKGROUND TASKS (NUMA & KSM)
+    # ==========================================================
+
+    # --- 1. NUMA Balancing (Crucial for Laptops) ---
+    # Laptops are UMA (Single Node). Balancing scans are wasted power.
+    DESC_NUMA="Disable NUMA. Stops memory scanning on single-socket PC's"
+
+    if [ "$opt_choice" == "2" ] || ([ "$opt_choice" == "3" ] && ask_opt "Disable the whole NUMA subsystem" "$DESC_NUMA"); then
+        # Ludicrous: Rip out the whole subsystem (Save RAM + CPU)
+        set_conf CONFIG_NUMA_BALANCING n
+        set_conf CONFIG_NUMA_BALANCING_DEFAULT_ENABLED n
+        set_conf CONFIG_NUMA n
+        set_conf CONFIG_AMD_NUMA n
+        set_conf CONFIG_X86_64_ACPI_NUMA n
+    else
+        set_conf CONFIG_NUMA_BALANCING y
+        set_conf CONFIG_NUMA_BALANCING_DEFAULT_ENABLED y
+        set_conf CONFIG_NUMA y
+        set_conf CONFIG_AMD_NUMA y
+        set_conf CONFIG_X86_64_ACPI_NUMA y
+    fi
+
+    # --- 2. KSM (Kernel Samepage Merging) ---
+    DESC_KSM="Disable KSM. Stops 'ksmd' thread from scanning memory. Saves CPU."
+    if [ "$opt_choice" != "1" ] || ask_opt "Disable KSM (Save CPU)" "$DESC_KSM"; then
+        set_conf CONFIG_KSM n
+    else
+        set_conf CONFIG_KSM y
+    fi
+
+    # --- 3. Virtualization (KVM) ---
+    DESC_KVM="Disable KVM. If you don't use Virtual Machines, save the overhead."
+    if ([ "$opt_choice" == "3" ] && ask_opt "Disable KVM Support" "$DESC_KVM"); then
+        set_conf CONFIG_KVM n
+        set_conf CONFIG_KVM_INTEL n
+        set_conf CONFIG_KVM_AMD n
+    else
+        set_conf CONFIG_KVM y
+        set_conf CONFIG_KVM_INTEL y
+        set_conf CONFIG_KVM_AMD y
+    fi
+
+    # ==========================================================
+    # [C] CPU SCHEDULING & GOVERNORS
     # ==========================================================
 
     # --- 1. Preemption (Latency vs Throughput) ---
@@ -198,7 +241,7 @@ if [[ "$opt_choice" =~ ^(1|2|3)$ ]]; then
     fi
 
     # ==========================================================
-    # [C] STORAGE (I/O) SCHEDULING
+    # [D] STORAGE (I/O) SCHEDULING
     # ==========================================================
 
     # Gaming: Kyber (Low latency for NVMe).
@@ -218,7 +261,7 @@ if [[ "$opt_choice" =~ ^(1|2|3)$ ]]; then
     fi
 
     # ==========================================================
-    # [D] MEMORY, NETWORK & BATTERY
+    # [E] MEMORY, NETWORK & BATTERY
     # ==========================================================
 
     # --- 1. SATA/AHCI Link Power Management (LPM) ---
