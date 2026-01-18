@@ -520,8 +520,8 @@ post_upgrade() {
 
 post_remove() {
   echo ">>> Removing initramfs images for ${PKG_NAME}..."
-  rm -f boot/initramfs-${PKG_NAME}.img
-  rm -f boot/initramfs-${PKG_NAME}-fallback.img
+  rm -f /boot/initramfs-${PKG_NAME}.img
+  rm -f /boot/initramfs-${PKG_NAME}-fallback.img
 }
 EOF
 
@@ -563,6 +563,8 @@ package_$PKG_NAME() {
   depends=('kmod' 'initramfs' 'mkinitcpio')
   optdepends=('linux-firmware: firmware images needed for some devices')
   provides=("VMLINUZ")
+
+  install="${PKG_NAME}.install"
 
   cd "${SRC_DIR_NAME}"
   local kernver="\$(cat ../version.txt | tr -d '[:space:]')"
