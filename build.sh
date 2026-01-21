@@ -489,12 +489,61 @@ echo -e "5) [Bleeding] x86-64-v4         $(get_status $V4_SUP)"
 read -p "Selection: " cpu_opt
 
 KCFLAGS_OPT="-mtune=generic"
+
+# Detect Host Details
+HOST_VENDOR=$(grep -m1 "vendor_id" /proc/cpuinfo | awk '{print $3}')
+IS_64BIT=$(grep -q " lm " /proc/cpuinfo && echo 1 || echo 0)
+
 case $cpu_opt in
-    1) set_conf "CONFIG_MNATIVE" "y"; set_conf "CONFIG_GENERIC_CPU" "n"; KCFLAGS_OPT="-march=native" ;;
+    1)
+        echo "   -> Configuring Native Optimization for: $HOST_VENDOR"
+
+        KCFLAGS_OPT="-march=native"
+        set_conf "CONFIG_GENERIC_CPU" "n"
+        set_conf "CONFIG_X86_NATIVE_CPU" "y"
+        set_conf "CONFIG_EXPERT" "y"
+        set_conf "CONFIG_PROCESSOR_SELECT" "y"
+
+        case "$HOST_VENDOR" in
+            "GenuineIntel")
+                set_conf "CONFIG_CPU_SUP_INTEL" "y"
+                set_conf "CONFIG_CPU_SUP_AMD" "n"
+                set_conf "CONFIG_CPU_SUP_HYGON" "n"
+                set_conf "CONFIG_CPU_SUP_CENTAUR" "n"
+                set_conf "CONFIG_CPU_SUP_ZHAOXIN" "n"
+                ;;
+            "AuthenticAMD")
+                set_conf "CONFIG_CPU_SUP_INTEL" "n"
+                set_conf "CONFIG_CPU_SUP_AMD" "y"
+                set_conf "CONFIG_CPU_SUP_HYGON" "n" # Hygon is based on AMD but distinct config
+                set_conf "CONFIG_CPU_SUP_CENTAUR" "n"
+                set_conf "CONFIG_CPU_SUP_ZHAOXIN" "n"
+                ;;
+            "HygonGenuine")
+                set_conf "CONFIG_CPU_SUP_INTEL" "n"
+                set_conf "CONFIG_CPU_SUP_AMD" "y" # Hygon usually requires AMD support
+                set_conf "CONFIG_CPU_SUP_HYGON" "y"
+                set_conf "CONFIG_CPU_SUP_CENTAUR" "n"
+                set_conf "CONFIG_CPU_SUP_ZHAOXIN" "n"
+                ;;
+            *)
+                echo "   -> Unknown vendor '$HOST_VENDOR'. Keeping all vendors enabled for safety."
+                ;;
+        esac
+
+        # 4. Disable Legacy/Obscure 32-bit CPUs on 64-bit systems
+        if [[ "$IS_64BIT" -eq 1 ]]; then
+            set_conf "CONFIG_CPU_SUP_CYRIX_32" "n"
+            set_conf "CONFIG_CPU_SUP_TRANSMETA_32" "n"
+            set_conf "CONFIG_CPU_SUP_UMC_32" "n"
+            set_conf "CONFIG_CPU_SUP_VORTEX_32" "n"
+        fi
+        ;;
     3) KCFLAGS_OPT="-march=x86-64-v2" ;;
     4) KCFLAGS_OPT="-march=x86-64-v3" ;;
     5) KCFLAGS_OPT="-march=x86-64-v4" ;;
 esac
+
 make $MAKE_FLAGS olddefconfig
 cp .config "$SAVED_CONFIG_PATH"
 
