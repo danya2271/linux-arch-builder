@@ -343,6 +343,57 @@ if [[ "$opt_choice" =~ ^(1|2|3)$ ]]; then
         set_conf CONFIG_TRANSPARENT_HUGEPAGE_MADVISE y
     fi
 
+    DESC_DEBLOAT="Remove obsolete hardware/protocols (Hamradio, ISDN, Legacy Ethernet/Audio, Crash Dumps)."
+
+    if [ "$opt_choice" == "3" ] && ask_opt "Apply Hardware Debloat" "$DESC_DEBLOAT"; then
+        echo "   -> Disabling Obsolete Protocols (Hamradio, ISDN, FDDI, WiMAX)..."
+        set_conf CONFIG_HAMRADIO n
+        set_conf CONFIG_ISDN n
+        set_conf CONFIG_FDDI n
+        set_conf CONFIG_HIPPI n
+        set_conf CONFIG_WIMAX n
+        set_conf CONFIG_NET_FC n
+
+        echo "   -> Disabling Legacy Ethernet Vendors (3COM, Adaptec, DEC, etc.)..."
+        set_conf CONFIG_NET_VENDOR_3COM n
+        set_conf CONFIG_NET_VENDOR_ADAPTEC n
+        set_conf CONFIG_NET_VENDOR_AGERE n
+        set_conf CONFIG_NET_VENDOR_ALACRITECH n
+        set_conf CONFIG_NET_VENDOR_ALTEON n
+        set_conf CONFIG_NET_VENDOR_AMD n
+        set_conf CONFIG_NET_VENDOR_ARC n
+        set_conf CONFIG_NET_VENDOR_ATHEROS n
+        set_conf CONFIG_NET_VENDOR_BROADCOM n
+        set_conf CONFIG_NET_VENDOR_DEC n
+        set_conf CONFIG_NET_VENDOR_DLINK n
+        set_conf CONFIG_NET_VENDOR_EMULEX n
+        set_conf CONFIG_NET_VENDOR_HUAWEI n
+        set_conf CONFIG_NET_VENDOR_NVIDIA n
+        set_conf CONFIG_NET_VENDOR_SIS n
+        set_conf CONFIG_NET_VENDOR_VIA n
+        set_conf CONFIG_NET_VENDOR_SILAN n
+
+        echo "   -> Disabling Legacy Input/Sound..."
+        # Disable Analog Gameports (Modern controllers use USB/HID)
+        set_conf CONFIG_INPUT_JOYSTICK n
+        # Disable legacy PCI Sound cards (SoundBlaster 16, etc - Modern is HDA/USB)
+        set_conf CONFIG_SND_PCI n
+
+        echo "   -> Disabling Guest Virtualization & Crash Dumps..."
+        # Disable acting as a Guest (Hyper-V/Xen/KVM Guest)
+        set_conf CONFIG_HYPERV n
+        set_conf CONFIG_XEN n
+        set_conf CONFIG_KVM_GUEST n
+        set_conf CONFIG_PARAVIRT n
+
+        # Disable Legacy/Enterprise SCSI drivers
+        set_conf CONFIG_SCSI_LOWLEVEL n
+
+        # Disable older Graphics drivers if not needed (Assuming Modern AMD/Nvidia/Intel)
+        set_conf CONFIG_DRM_RADEON n
+        set_conf CONFIG_DRM_NOUVEAU n
+    fi
+
     make $MAKE_FLAGS olddefconfig
 fi
 
@@ -395,6 +446,11 @@ if [[ "$kill_debug" =~ ^[Yy]$ ]]; then
     set_conf CONFIG_DEBUG_BUGVERBOSE n
     set_conf CONFIG_DEBUG_LIST n
     set_conf CONFIG_BUG_ON_DATA_CORRUPTION n
+    set_conf CONFIG_CRASH_DUMP n
+    set_conf CONFIG_KEXEC n
+    set_conf CONFIG_DEBUG_FS n
+    set_conf CONFIG_PAGE_POISONING n
+
 fi
 
 # --- 5. Drivers & Hardware Optimization ---
