@@ -118,14 +118,14 @@ if [[ "$opt_choice" =~ ^(1|2|3)$ ]]; then
     DESC_MIT_OFF="Disable Mitigations. Boosts CPU performance significantly, reduces security."
 
     if [ "$opt_choice" == "1" ] || ([ "$opt_choice" == "3" ] && ask_opt "Disable CPU Mitigations (Speed Boost)" "$DESC_MIT_OFF"); then
-        set_conf CONFIG_SPECULATION_MITIGATIONS n
+        set_conf CONFIG_CPU_MITIGATIONS n
         set_conf CONFIG_MITIGATION_RETPOLINE n
         set_conf CONFIG_MITIGATION_SLS n
         set_conf CONFIG_RETPOLINE n
         set_conf CONFIG_SLS n
     else
         # Default / Laptop (Secure)
-        set_conf CONFIG_SPECULATION_MITIGATIONS y
+        set_conf CONFIG_CPU_MITIGATIONS y
     fi
 
     # ==========================================================
