@@ -442,7 +442,10 @@ if [[ "$kill_debug" =~ ^[Yy]$ ]]; then
     set_conf CONFIG_ACPI_DEBUG n
     set_conf CONFIG_PM_TRACE n
 
-    # 7. Other
+    # 7. Scheduler-related
+    set_conf CONFIG_SCHEDSTATS n
+
+    # 8. Other
     set_conf CONFIG_DEBUG_BUGVERBOSE n
     set_conf CONFIG_DEBUG_LIST n
     set_conf CONFIG_BUG_ON_DATA_CORRUPTION n
