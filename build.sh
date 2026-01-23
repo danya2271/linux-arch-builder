@@ -555,6 +555,8 @@ case $cpu_opt in
         echo "   -> Configuring Native Optimization for: $HOST_VENDOR"
 
         KCFLAGS_OPT="-march=native"
+        set_conf "CONFIG_FORCE_NR_CPUS" "y"
+        set_conf "CONFIG_NR_CPUS" $(($(nproc)))
         set_conf "CONFIG_GENERIC_CPU" "n"
         set_conf "CONFIG_X86_NATIVE_CPU" "y"
         set_conf "CONFIG_EXPERT" "y"
