@@ -351,6 +351,16 @@ if [[ "$opt_choice" =~ ^(1|2|3)$ ]]; then
         set_conf CONFIG_DAMON y
     fi
 
+    # --- 9. Legacy syscalls (obsolete) ---
+    DESC="MODIFY_LDT_SYSCALL Bypasses an old system call used by Wine for very old Windows apps. Modern games don't use it."
+    if [ "$opt_choice" == "1" ] || [ "$opt_choice" == "2" ] || ask_opt "Disable MODIFY_LDT_SYSCALL" "$DESC"; then
+        set_conf CONFIG_16BIT n
+        set_conf CONFIG_MODIFY_LDT_SYSCALL n
+    else
+        set_conf CONFIG_MODIFY_LDT_SYSCALL y
+        set_conf CONFIG_16BIT y
+    fi
+
 
     DESC_DEBLOAT="Remove obsolete hardware/protocols (Hamradio, ISDN, Legacy Ethernet/Audio, Crash Dumps)."
 
