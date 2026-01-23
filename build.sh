@@ -343,6 +343,15 @@ if [[ "$opt_choice" =~ ^(1|2|3)$ ]]; then
         set_conf CONFIG_TRANSPARENT_HUGEPAGE_MADVISE y
     fi
 
+    # --- 8. DAMON ---
+    DESC="Data Access MONitoring. Useful for servers with much of RAM (>256gb), useless and (sometimes) harmful for desktop PC's"
+    if [ "$opt_choice" == "1" ] || [ "$opt_choice" == "2" ] || ask_opt "Enable DAMON" "$DESC"; then
+        set_conf CONFIG_DAMON y
+    else
+        set_conf CONFIG_DAMON n
+    fi
+
+
     DESC_DEBLOAT="Remove obsolete hardware/protocols (Hamradio, ISDN, Legacy Ethernet/Audio, Crash Dumps)."
 
     if [ "$opt_choice" == "3" ] && ask_opt "Apply Hardware Debloat" "$DESC_DEBLOAT"; then
