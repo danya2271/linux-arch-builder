@@ -460,9 +460,26 @@ if [[ "$kill_debug" =~ ^[Yy]$ ]]; then
     set_conf CONFIG_BUG_ON_DATA_CORRUPTION n
     set_conf CONFIG_CRASH_DUMP n
     set_conf CONFIG_KEXEC n
-    set_conf CONFIG_DEBUG_FS n
     set_conf CONFIG_PAGE_POISONING n
 
+fi
+
+read -p "Disable debug fs? (y/N): " kill_debug_fs
+if [[ "$kill_debug_fs" =~ ^[Yy]$ ]]; then
+    echo -e "${GREEN}Disabling debug fs...${NC}"
+    set_conf CONFIG_DEBUG_FS n
+elif [[ "$kill_debug_fs" =~ ^[Nn]$ ]]; then
+    echo -e "${GREEN}Enabling debug fs...${NC}"
+    set_conf CONFIG_DEBUG_FS y
+fi
+
+read -p "Disable kallsyms? (y/N): " kill_ksyms
+if [[ "$kill_ksyms" =~ ^[Yy]$ ]]; then
+    echo -e "${GREEN}Disabling kallsyms...${NC}"
+    set_conf CONFIG_KALLSYMS n
+elif [[ "$kill_ksyms" =~ ^[Nn]$ ]]; then
+    echo -e "${GREEN}Enabling kallsyms...${NC}"
+    set_conf CONFIG_KALLSYMS y
 fi
 
 # --- 5. Drivers & Hardware Optimization ---
