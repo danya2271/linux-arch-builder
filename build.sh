@@ -395,8 +395,6 @@ if [[ "$opt_choice" =~ ^(1|2|3)$ ]]; then
         echo "   -> Disabling Legacy Input/Sound..."
         # Disable Analog Gameports (Modern controllers use USB/HID)
         set_conf CONFIG_INPUT_JOYSTICK n
-        # Disable legacy PCI Sound cards (SoundBlaster 16, etc - Modern is HDA/USB)
-        set_conf CONFIG_SND_PCI n
 
         echo "   -> Disabling Guest Virtualization & Crash Dumps..."
         # Disable acting as a Guest (Hyper-V/Xen/KVM Guest)
