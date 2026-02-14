@@ -39,19 +39,19 @@ cd "$SRC_DIR_NAME"
 
 # --- 2. Compiler ---
 echo -e "\n${BLUE}=== [2/7] Compiler ===${NC}"
-echo "1) GCC (Default)"
-echo "2) Clang/LLVM"
-read -p "Selection (Enter=1): " compiler_choice
+echo "1) GCC"
+echo "2) Clang/LLVM (Default)"
+read -p "Selection (Enter=2): " compiler_choice
 
 MAKE_FLAGS=""
 COMPILER_DEPS="'bc' 'libelf' 'pahole' 'cpio' 'perl' 'tar' 'xz' 'git' 'xmlto' 'kmod' 'inetutils'"
 
-if [ "$compiler_choice" == "2" ]; then
+if [ "$compiler_choice" == "1" ]; then
+    echo -e "${GREEN}Selected: GCC${NC}"
+else
     echo -e "${YELLOW}Selected: CLANG${NC}"
     MAKE_FLAGS="LLVM=1 LLVM_IAS=1"
     COMPILER_DEPS="${COMPILER_DEPS} 'clang' 'llvm' 'lld'"
-else
-    echo -e "${GREEN}Selected: GCC${NC}"
 fi
 
 # --- Config Helper ---
