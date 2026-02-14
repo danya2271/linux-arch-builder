@@ -697,6 +697,14 @@ prepare() {
 
 build() {
   cd "${SRC_DIR_NAME}"
+
+  # Force userspace tools (objtool, resolve_btfids) to use the selected CPU level.
+  # This overrides /etc/makepkg.conf settings which might be set to -march=native (v3).
+  export CFLAGS="${KCFLAGS_OPT} -O3 -pipe"
+  export CXXFLAGS="${KCFLAGS_OPT} -O3 -pipe"
+  export LDFLAGS="-Wl,-O1,--sort-common,--as-needed,-z,relro,-z,now"
+  export HOSTCFLAGS="${KCFLAGS_OPT} -O3 -pipe"
+
   make $MAKE_FLAGS KCFLAGS="${KCFLAGS_OPT} -O3 -pipe" -j\$(nproc) all
 
   make kernelrelease > ../version.txt
