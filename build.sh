@@ -101,6 +101,44 @@ set_conf CONFIG_LOCALVERSION_AUTO n
 
 # --- 3.5 Optimization Layer ---
 echo -e "\n${BLUE}=== [3.5] Optimization Layer ===${NC}"
+
+echo -e "${YELLOW}Select Compiler Optimization Level:${NC}"
+echo "1) Maximum Performance (-O3) [Default]"
+echo "2) Standard Performance (-O2)"
+echo "3) Optimize for Size (-Os)"
+read -p "Selection (Enter=1): " cc_opt_select
+
+set_conf CONFIG_CC_OPTIMIZE_FOR_MAXIMUM_PERFORMANCE n
+set_conf CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE n
+set_conf CONFIG_CC_OPTIMIZE_FOR_SIZE n
+
+# Default variable for PKGBUILD
+OPT_LEVEL_FLAG="-O3"
+
+case $cc_opt_select in
+    2)
+        echo "   -> Setting -O2 (Standard)"
+        set_conf CONFIG_CC_OPTIMIZE_FOR_MAXIMUM_PERFORMANCE n
+        set_conf CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE y
+        set_conf CONFIG_CC_OPTIMIZE_FOR_SIZE n
+        OPT_LEVEL_FLAG="-O2"
+        ;;
+    3)
+        echo "   -> Setting -Os (Size)"
+        set_conf CONFIG_CC_OPTIMIZE_FOR_MAXIMUM_PERFORMANCE n
+        set_conf CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE n
+        set_conf CONFIG_CC_OPTIMIZE_FOR_SIZE y
+        OPT_LEVEL_FLAG="-Os"
+        ;;
+    *)
+        echo "   -> Setting -O3 (Max Performance)"
+        set_conf CONFIG_CC_OPTIMIZE_FOR_MAXIMUM_PERFORMANCE y
+        set_conf CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE n
+        set_conf CONFIG_CC_OPTIMIZE_FOR_SIZE n
+        OPT_LEVEL_FLAG="-O3"
+        ;;
+esac
+
 echo "1) [Gaming]  Auto-apply best gaming tweaks (Low Latency / High Perf)"
 echo "2) [Laptop]  Auto-apply best battery tweaks (Power Save / Secure)"
 echo "3) [Manual]  Set each flag manually with description"
@@ -700,12 +738,12 @@ build() {
 
   # Force userspace tools (objtool, resolve_btfids) to use the selected CPU level.
   # This overrides /etc/makepkg.conf settings which might be set to -march=native (v3).
-  export CFLAGS="${KCFLAGS_OPT} -O3 -pipe"
-  export CXXFLAGS="${KCFLAGS_OPT} -O3 -pipe"
+  export CFLAGS="${KCFLAGS_OPT} ${OPT_LEVEL_FLAG} -pipe"
+  export CXXFLAGS="${KCFLAGS_OPT} ${OPT_LEVEL_FLAG} -pipe"
   export LDFLAGS="-Wl,-O1,--sort-common,--as-needed,-z,relro,-z,now"
-  export HOSTCFLAGS="${KCFLAGS_OPT} -O3 -pipe"
+  export HOSTCFLAGS="${KCFLAGS_OPT} ${OPT_LEVEL_FLAG} -pipe"
 
-  make $MAKE_FLAGS KCFLAGS="${KCFLAGS_OPT} -O3 -pipe" -j\$(nproc) all
+  make $MAKE_FLAGS KCFLAGS="${KCFLAGS_OPT} ${OPT_LEVEL_FLAG} -pipe" -j\$(nproc) all
 
   make kernelrelease > ../version.txt
 }
