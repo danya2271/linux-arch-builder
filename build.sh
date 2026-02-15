@@ -139,6 +139,30 @@ case $cc_opt_select in
         ;;
 esac
 
+echo -e "${YELLOW}LTO optimization:${NC}"
+echo "1) Use default [Default]"
+echo "2) Use ThinLTO"
+echo "3) Use FullLTO"
+read -p "Selection (Enter=1): " cc_lto_select
+
+case $cc_lto_select in
+    2)
+        echo "   -> Setting ThinLTO"
+        set_conf CONFIG_CC_OPTIMIZE_FOR_MAXIMUM_PERFORMANCE n
+        set_conf CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE y
+        set_conf CONFIG_CC_OPTIMIZE_FOR_SIZE n
+        ;;
+    3)
+        echo "   -> Setting FullLTO"
+        set_conf CONFIG_CC_OPTIMIZE_FOR_MAXIMUM_PERFORMANCE n
+        set_conf CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE n
+        set_conf CONFIG_CC_OPTIMIZE_FOR_SIZE y
+        ;;
+    *)
+        echo "   -> Not changing anything"
+        ;;
+esac
+
 echo "1) [Gaming]  Auto-apply best gaming tweaks (Low Latency / High Perf)"
 echo "2) [Laptop]  Auto-apply best battery tweaks (Power Save / Secure)"
 echo "3) [Manual]  Set each flag manually with description"
@@ -147,6 +171,14 @@ read -p "Selection: " opt_choice
 
 if [[ "$opt_choice" =~ ^(1|2|3)$ ]]; then
     set_conf CONFIG_EXPERT y
+
+    DESC="This option enables LLVM's polyhedral loop optimizer known as Polly. Polly is able to optimize various loops throughout the kernel for
+	  maximum cache locality"
+    if [ "$opt_choice" == "1" ] || [ "$opt_choice" == "2" ] || ([ "$opt_choice" == "3" ] && ask_opt "Enable LLVM's polyhedral loop optimizer (Polly)" "$DESC"); then
+        set_conf LLVM_POLLY y
+    else
+        set_conf LLVM_POLLY n
+    fi
 
     # ==========================================================
     # [A] SECURITY MITIGATIONS (The "Free Performance" Switch)
