@@ -719,19 +719,44 @@ mkdir -p build
 cp "$SRC_DIR_NAME/.config" build/config
 cd build
 
-# --- 7. PKGBUILD ---
-echo -e "\n${BLUE}=== [7/7] PKGBUILD ===${NC}"
+# --- 7. Select Target OS Packages ---
+echo -e "\n${BLUE}===[7/7] Package Building ===${NC}"
+echo "1) Build ONLY Ubuntu/Debian (.deb) packages"
+echo "2) Build ONLY Arch Linux (.pkg.tar.zst) packages"
+echo "3) Build BOTH variants"
+read -p "Selection (Enter=1): " build_target
+[[ -z "$build_target" ]] && build_target="1"
 
-cat > "${PKG_NAME}.install" <<EOF
+# Prepare variables for paths
+export LOCALVERSION="-kknx" # Ensures the kernel is named with -kknx
+
+if [[ "$build_target" == "1" || "$build_target" == "3" ]]; then
+    echo -e "\n${YELLOW}=== Building Ubuntu/Debian (.deb) Packages ===${NC}"
+    cd "$WORK_DIR/$SRC_DIR_NAME"
+
+    # Ensure variables are exported for the make process
+    export CFLAGS="${KCFLAGS_OPT} ${OPT_LEVEL_FLAG} -pipe"
+    export CXXFLAGS="${KCFLAGS_OPT} ${OPT_LEVEL_FLAG} -pipe"
+    export HOSTCFLAGS="${KCFLAGS_OPT} ${OPT_LEVEL_FLAG} -pipe"
+
+    # bindeb-pkg builds the kernel and packages it into .deb files in the parent directory
+    make $MAKE_FLAGS KCFLAGS="${KCFLAGS_OPT} ${OPT_LEVEL_FLAG} -pipe" -j$(nproc) bindeb-pkg
+
+    echo -e "${GREEN}Debian packages built successfully!${NC}"
+fi
+
+if [[ "$build_target" == "2" || "$build_target" == "3" ]]; then
+    echo -e "\n${YELLOW}=== Building Arch Linux (.pkg.tar.zst) Packages ===${NC}"
+    cd "$WORK_DIR/build"
+
+    cat > "${PKG_NAME}.install" <<EOF
 post_install() {
   echo ">>> KKNX kernel installed. Generating initramfs..."
   mkinitcpio -p ${PKG_NAME}
 }
-
 post_upgrade() {
   post_install
 }
-
 post_remove() {
   echo ">>> Removing initramfs images for ${PKG_NAME}..."
   rm -f /boot/initramfs-${PKG_NAME}.img
@@ -739,7 +764,7 @@ post_remove() {
 }
 EOF
 
-cat > PKGBUILD <<EOF
+    cat > PKGBUILD <<EOF
 # Maintainer: danya2271
 pkgbase=$PKG_NAME
 pkgname=("$PKG_NAME" "$PKG_NAME-headers")
@@ -751,7 +776,7 @@ url="$REPO_URL"
 license=('GPL2')
 makedepends=($COMPILER_DEPS)
 options=('!strip')
-source=("git+file://${WORK_DIR}/${SRC_DIR_NAME}#branch=$(cd ${WORK_DIR}/${SRC_DIR_NAME} && git branch --show-current)" "config")
+source=("git+file://${WORK_DIR}/${SRC_DIR_NAME}#branch=\$(cd ${WORK_DIR}/${SRC_DIR_NAME} && git branch --show-current)" "config")
 sha256sums=('SKIP' 'SKIP')
 
 pkgver() {
@@ -767,16 +792,12 @@ prepare() {
 
 build() {
   cd "${SRC_DIR_NAME}"
-
-  # Force userspace tools (objtool, resolve_btfids) to use the selected CPU level.
-  # This overrides /etc/makepkg.conf settings which might be set to -march=native (v3).
   export CFLAGS="${KCFLAGS_OPT} ${OPT_LEVEL_FLAG} -pipe"
   export CXXFLAGS="${KCFLAGS_OPT} ${OPT_LEVEL_FLAG} -pipe"
   export LDFLAGS="-Wl,-O1,--sort-common,--as-needed,-z,relro,-z,now"
   export HOSTCFLAGS="${KCFLAGS_OPT} ${OPT_LEVEL_FLAG} -pipe"
 
   make $MAKE_FLAGS KCFLAGS="${KCFLAGS_OPT} ${OPT_LEVEL_FLAG} -pipe" -j\$(nproc) all
-
   make kernelrelease > ../version.txt
 }
 
@@ -785,18 +806,13 @@ package_$PKG_NAME() {
   depends=('kmod' 'initramfs' 'mkinitcpio')
   optdepends=('linux-firmware: firmware images needed for some devices')
   provides=("VMLINUZ")
-
   install="${PKG_NAME}.install"
-
   cd "${SRC_DIR_NAME}"
   local kernver="\$(cat ../version.txt | tr -d '[:space:]')"
   local modulesdir="\${pkgdir}/usr/lib/modules/\${kernver}"
 
-  echo "Installing modules for version: [\${kernver}]"
   make $MAKE_FLAGS INSTALL_MOD_PATH="\${pkgdir}/usr" modules_install
-
   rm -f "\${modulesdir}/build" "\${modulesdir}/source"
-
   ln -sf "/usr/src/linux-kknx-\${kernver}" "\${modulesdir}/build"
 
   mkdir -p "\${pkgdir}/boot"
@@ -817,11 +833,8 @@ package_$PKG_NAME-headers() {
   local kernver="\$(cat ../version.txt | tr -d '[:space:]')"
   local builddir="\${pkgdir}/usr/src/linux-kknx-\${kernver}"
 
-  echo "Installing headers to: \${builddir}"
   mkdir -p "\${builddir}"
-
   cp .config Makefile Module.symvers System.map "\${builddir}/"
-
   cp -a include scripts arch "\${builddir}/"
 
   find "\${builddir}/scripts" -type f -name "*.o" -delete
@@ -831,8 +844,7 @@ package_$PKG_NAME-headers() {
     mkdir -p "\${builddir}/tools/objtool"
     cp tools/objtool/objtool "\${builddir}/tools/objtool/"
   fi
-
-  if [ -f tools/bpf/resolve_btfids/resolve_btfids ]; then
+  if[ -f tools/bpf/resolve_btfids/resolve_btfids ]; then
     mkdir -p "\${builddir}/tools/bpf/resolve_btfids"
     cp tools/bpf/resolve_btfids/resolve_btfids "\${builddir}/tools/bpf/resolve_btfids/"
   fi
@@ -840,67 +852,56 @@ package_$PKG_NAME-headers() {
   find "\${builddir}" -name "*.cmd" -delete
   find "\${builddir}" -name "*.a" -delete
   find "\${builddir}" -name "..install.cmd" -delete
-
   chmod 755 -R "\${builddir}/scripts"
 }
 EOF
 
-# --- Сборка ---
-echo -e "${YELLOW}Build start...${NC}"
-rm -rf src pkg
-makepkg -sf --noconfirm
+    echo -e "${YELLOW}Makepkg start...${NC}"
+    rm -rf src pkg
+    makepkg -sf --noconfirm
+fi
 
-# --- Финиш ---
+# --- Finish & Export ---
 echo -e "\n${BLUE}=== DONE ===${NC}"
-PKG_FILE=$(find . -maxdepth 1 -type f -name "${PKG_NAME}-[0-9]*.pkg.tar.zst" | sort -V | tail -n 1)
-PKG_HEADER=$(find . -maxdepth 1 -type f -name "${PKG_NAME}-headers-*.pkg.tar.zst" | sort -V | tail -n 1)
+mkdir -p "$EXPORT_DIR"
+EXPORT_COUNT=0
 
-PKG_FILE="${PKG_FILE#./}"
-PKG_HEADER="${PKG_HEADER#./}"
+# Gather DEB packages
+if ls "$WORK_DIR"/*.deb 1> /dev/null 2>&1; then
+    echo -e "${GREEN}Found Ubuntu (.deb) packages. Copying to export dir...${NC}"
+    cp "$WORK_DIR"/*.deb "$EXPORT_DIR/"
+    for f in "$WORK_DIR"/*.deb; do echo " -> $(basename "$f")"; done
+    EXPORT_COUNT=$((EXPORT_COUNT+1))
+fi
 
-if [ -n "$PKG_FILE" ]; then
-    echo -e "Kernel:   ${GREEN}$PKG_FILE${NC}"
-    echo -e "Headers: ${GREEN}$PKG_HEADER${NC}"
+# Gather Arch packages
+if ls "$WORK_DIR/build"/*.pkg.tar.zst 1> /dev/null 2>&1; then
+    echo -e "${GREEN}Found Arch (.pkg.tar.zst) packages. Copying to export dir...${NC}"
+    cp "$WORK_DIR/build"/*.pkg.tar.zst "$EXPORT_DIR/"
+    for f in "$WORK_DIR/build"/*.pkg.tar.zst; do echo " -> $(basename "$f")"; done
+    EXPORT_COUNT=$((EXPORT_COUNT+1))
+fi
 
-    read -p "Install? (y/N): " inst
-    if [[ "$inst" =~ ^[Yy]$ ]]; then
+if [ $EXPORT_COUNT -gt 0 ]; then
+    echo -e "\n${GREEN}All generated packages have been saved to: $EXPORT_DIR${NC}"
 
-        # --- 1. CLEANUP CONFLICTS ---
-        echo -e "${YELLOW}Checking for conflicting directories...${NC}"
-
-        # Get correct path
-        cd "$WORK_DIR/$SRC_DIR_NAME"
-        CURRENT_KVER=$(make kernelrelease)
-        cd "$WORK_DIR/build"
-
-        CONFLICT_DIR="/usr/lib/modules/$CURRENT_KVER/build"
-        CONFLICT_SRC="/usr/lib/modules/$CURRENT_KVER/source"
-
-        # Remove old symlinks or directories to avoid Pacman conflicts
-        if [ -e "$CONFLICT_DIR" ]; then
-            echo "Removing conflicting entry: $CONFLICT_DIR"
-            sudo rm -rf "$CONFLICT_DIR"
+    # Auto-Install Logic for DEB on Ubuntu
+    if [[ "$build_target" == "1" || "$build_target" == "3" ]] && command -v dpkg &> /dev/null; then
+        read -p "Install the generated Ubuntu (.deb) kernel right now? (y/N): " inst_deb
+        if [[ "$inst_deb" =~ ^[Yy]$ ]]; then
+            sudo dpkg -i "$EXPORT_DIR"/linux-image-*.deb "$EXPORT_DIR"/linux-headers-*.deb
+            sudo update-grub
         fi
-
-        if [ -e "$CONFLICT_SRC" ]; then
-             echo "Removing conflicting entry: $CONFLICT_SRC"
-             sudo rm -rf "$CONFLICT_SRC"
-        fi
-        # ----------------------------
-
-        sudo pacman -U "$PKG_FILE" "$PKG_HEADER" --overwrite='*' --noconfirm
-
-        echo -e "\n${YELLOW}IMPORTANT:${NC} Do not forget: sudo grub-mkconfig -o /boot/grub/grub.cfg"
     fi
 
-    # ... (Export part remains same)
-    read -p "Export to $EXPORT_DIR? (y/N): " exp
-    if [[ "$exp" =~ ^[Yy]$ ]]; then
-        mkdir -p "$EXPORT_DIR"
-        cp "$PKG_FILE" "$EXPORT_DIR/"
-        [ -n "$PKG_HEADER" ] && cp "$PKG_HEADER" "$EXPORT_DIR/"
-        echo "Copied"
+    # Auto-Install Logic for Arch
+    if [[ "$build_target" == "2" || "$build_target" == "3" ]] && command -v pacman &> /dev/null; then
+        read -p "Install the generated Arch (.pkg.tar.zst) kernel right now? (y/N): " inst_arch
+        if [[ "$inst_arch" =~ ^[Yy]$ ]]; then
+            sudo pacman -U "$EXPORT_DIR"/*${PKG_NAME}-*.pkg.tar.zst --overwrite='*' --noconfirm
+            echo -e "\n${YELLOW}IMPORTANT:${NC} Do not forget: sudo grub-mkconfig -o /boot/grub/grub.cfg"
+        fi
     fi
 else
-    echo -e "${RED}Error: Package files not found!${NC}"
+    echo -e "${RED}Error: No package files were successfully generated!${NC}"
 fi
