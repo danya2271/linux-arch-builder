@@ -167,15 +167,13 @@ read -p "Selection (Enter=1): " cc_lto_select
 case $cc_lto_select in
     2)
         echo "   -> Setting ThinLTO"
-        set_conf CONFIG_CC_OPTIMIZE_FOR_MAXIMUM_PERFORMANCE n
-        set_conf CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE y
-        set_conf CONFIG_CC_OPTIMIZE_FOR_SIZE n
+        set_conf CONFIG_LTO_CLANG_THIN y
+        set_conf CONFIG_LTO_CLANG_FULL n
         ;;
     3)
         echo "   -> Setting FullLTO"
-        set_conf CONFIG_CC_OPTIMIZE_FOR_MAXIMUM_PERFORMANCE n
-        set_conf CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE n
-        set_conf CONFIG_CC_OPTIMIZE_FOR_SIZE y
+        set_conf CONFIG_LTO_CLANG_THIN n
+        set_conf CONFIG_LTO_CLANG_FULL y
         ;;
     *)
         echo "   -> Not changing anything"
