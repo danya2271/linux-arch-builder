@@ -88,12 +88,31 @@ echo "4) [RESET]   Reset to Arch Default"
 read -p "Selection: " config_src
 if [ -f ".config" ]; then rm .config; fi
 
+get_system_config() {
+    if [ -f /proc/config.gz ]; then
+        # Arch Linux method
+        zcat /proc/config.gz > .config
+    elif [ -f "/boot/config-$(uname -r)" ]; then
+        # Ubuntu / Debian method
+        cp "/boot/config-$(uname -r)" .config
+    else
+        # If neither exists, attempt to load the module (sometimes it's just unloaded)
+        modprobe configs 2>/dev/null
+        if [ -f /proc/config.gz ]; then
+            zcat /proc/config.gz > .config
+        else
+            echo -e "${RED}Error: Cannot find system config. Falling back to default.${NC}"
+            make $MAKE_FLAGS defconfig
+        fi
+    fi
+}
+
 case $config_src in
-    1) zcat /proc/config.gz > .config ;;
-    2) [ -f "$SAVED_CONFIG_PATH" ] && cp "$SAVED_CONFIG_PATH" .config || zcat /proc/config.gz > .config ;;
+    1) get_system_config ;;
+    2) [ -f "$SAVED_CONFIG_PATH" ] && cp "$SAVED_CONFIG_PATH" .config || get_system_config ;;
     3) read -e -p "Enter path: " p; cp "${p/#\~/$HOME}" .config ;;
     4) find arch/x86/configs/ -name "*_defconfig" -printf "%f\n"; read -p "Name: " d; make $MAKE_FLAGS "$d" ;;
-    *) [ -f "$SAVED_CONFIG_PATH" ] && cp "$SAVED_CONFIG_PATH" .config || zcat /proc/config.gz > .config ;;
+    *)[ -f "$SAVED_CONFIG_PATH" ] && cp "$SAVED_CONFIG_PATH" .config || get_system_config ;;
 esac
 make $MAKE_FLAGS olddefconfig
 
