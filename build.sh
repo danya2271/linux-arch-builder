@@ -757,7 +757,7 @@ if [[ "$build_target" == "1" || "$build_target" == "3" ]]; then
     export HOSTCFLAGS="${KCFLAGS_OPT} ${OPT_LEVEL_FLAG} -pipe"
 
     # bindeb-pkg builds the kernel and packages it into .deb files in the parent directory
-    make $MAKE_FLAGS KCFLAGS="${KCFLAGS_OPT} ${OPT_LEVEL_FLAG} -pipe" -j$(nproc) bindeb-pkg
+    make $MAKE_FLAGS KCFLAGS="${KCFLAGS_OPT} ${OPT_LEVEL_FLAG} -pipe" -j$(nproc) bindeb-pkg DPKG_FLAGS="-d"
 
     echo -e "${GREEN}Debian packages built successfully!${NC}"
 fi
