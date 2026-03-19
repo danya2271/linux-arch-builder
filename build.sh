@@ -861,7 +861,7 @@ package_$PKG_NAME-headers() {
     mkdir -p "\${builddir}/tools/objtool"
     cp tools/objtool/objtool "\${builddir}/tools/objtool/"
   fi
-  if[ -f tools/bpf/resolve_btfids/resolve_btfids ]; then
+  if [ -f tools/bpf/resolve_btfids/resolve_btfids ]; then
     mkdir -p "\${builddir}/tools/bpf/resolve_btfids"
     cp tools/bpf/resolve_btfids/resolve_btfids "\${builddir}/tools/bpf/resolve_btfids/"
   fi
