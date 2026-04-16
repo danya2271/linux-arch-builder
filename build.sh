@@ -793,29 +793,35 @@ url="$REPO_URL"
 license=('GPL2')
 makedepends=($COMPILER_DEPS)
 options=('!strip')
-source=("git+file://${WORK_DIR}/${SRC_DIR_NAME}#branch=\$(cd ${WORK_DIR}/${SRC_DIR_NAME} && git branch --show-current)" "config")
-sha256sums=('SKIP' 'SKIP')
+
+# УБИРАЕМ git репозиторий отсюда. Оставляем ТОЛЬКО файл конфигурации.
+source=("config")
+sha256sums=('SKIP')
+
+# Указываем абсолютный путь к папке исходников, которую скрипт подготовил на шаге 1
+_srcdir="${WORK_DIR}/${SRC_DIR_NAME}"
 
 pkgver() {
-  cd "${SRC_DIR_NAME}"
+  cd "\$_srcdir"
   make kernelversion | tr -d '[:space:]' | tr '-' '_'
 }
 
 prepare() {
-  cd "${SRC_DIR_NAME}"
-  cp ../config .config
+  cd "\$_srcdir"
+  # Берем конфиг из папки makepkg и кладем в нашу папку с исходниками
+  cp "\$srcdir/config" .config
   make $MAKE_FLAGS olddefconfig
 }
 
 build() {
-  cd "${SRC_DIR_NAME}"
+  cd "\$_srcdir"
   export CFLAGS="${KCFLAGS_OPT} ${OPT_LEVEL_FLAG} -pipe"
   export CXXFLAGS="${KCFLAGS_OPT} ${OPT_LEVEL_FLAG} -pipe"
   export LDFLAGS="-Wl,-O1,--sort-common,--as-needed,-z,relro,-z,now"
   export HOSTCFLAGS="${KCFLAGS_OPT} ${OPT_LEVEL_FLAG} -pipe"
 
   make $MAKE_FLAGS KCFLAGS="${KCFLAGS_OPT} ${OPT_LEVEL_FLAG} -pipe" -j\$(nproc) all
-  make kernelrelease > ../version.txt
+  make kernelrelease > "\$srcdir/version.txt"
 }
 
 package_$PKG_NAME() {
@@ -824,8 +830,11 @@ package_$PKG_NAME() {
   optdepends=('linux-firmware: firmware images needed for some devices')
   provides=("VMLINUZ")
   install="${PKG_NAME}.install"
-  cd "${SRC_DIR_NAME}"
-  local kernver="\$(cat ../version.txt | tr -d '[:space:]')"
+
+  # Заходим в наши исходники
+  cd "\$_srcdir"
+
+  local kernver="\$(cat \$srcdir/version.txt | tr -d '[:space:]')"
   local modulesdir="\${pkgdir}/usr/lib/modules/\${kernver}"
 
   make $MAKE_FLAGS INSTALL_MOD_PATH="\${pkgdir}/usr" modules_install
@@ -846,8 +855,11 @@ package_$PKG_NAME() {
 package_$PKG_NAME-headers() {
   pkgdesc="Kernel KKNX headers"
   depends=('pahole')
-  cd "${SRC_DIR_NAME}"
-  local kernver="\$(cat ../version.txt | tr -d '[:space:]')"
+
+  # Заходим в наши исходники
+  cd "\$_srcdir"
+
+  local kernver="\$(cat \$srcdir/version.txt | tr -d '[:space:]')"
   local builddir="\${pkgdir}/usr/src/linux-kknx-\${kernver}"
 
   mkdir -p "\${builddir}"
