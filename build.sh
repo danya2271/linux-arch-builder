@@ -37,6 +37,14 @@ else
 fi
 cd "$SRC_DIR_NAME"
 
+echo -e "\n${YELLOW}Source tree cleanup${NC}"
+echo "Recommended when occuring with unknown errors"
+read -p "Clean old compilation files? (git clean -fdx)? (y/N): " do_clean
+if [[ "$do_clean" =~ ^[Yy]$ ]]; then
+    echo -e "${GREEN}Cleaning sources...${NC}"
+    git clean -fdx
+fi
+
 # --- 2. Compiler ---
 echo -e "\n${BLUE}=== [2/7] Compiler ===${NC}"
 echo "1) GCC"
